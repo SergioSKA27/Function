@@ -9,6 +9,7 @@
 #include <streambuf>
 #include <bit>
 #include <algorithm>
+#include <cmath>
 // Autor: Lopez Martinez Sergio Demis
 
 // This struct will help us to create the sintax tree
@@ -127,13 +128,13 @@ template <typename T>
 class Function
 {
 private:
-    std::string name;                 // name of the function
-    std::vector<char> variable_names; // vector for the name of the variables
-    std::string expresion;            // normal representation of the function
-    std::string sufix_expr;           // sufix representation
-    std::string prefix_expr;          // prefix representation;
+    std::string name;                 // nombre de la function
+    std::vector<char> variable_names; // vector para el nombre de las variables
+    std::string expresion;            // representacion normal  de la funcion
+    std::string sufix_expr;           // representacion sufijo
+    std::string prefix_expr;          // representacion prefijo
 
-    Function<T> &sufix_tranform();
+    std::string sufix_tranform(std::string xpr);
     Function<T> &prefix_tranform();
     bool is_operator(char op);
     inline bool is_parentheses(char c);
@@ -143,7 +144,6 @@ private:
     Function<T> &fix_expression();
 
     T eval_op(T A, char op, T B);
-    T evaluate_expression();
 
 public:
     Function(std::string name, std::string func, std::initializer_list<char> variables);
@@ -154,6 +154,8 @@ public:
     template <typename... args>
     T operator()(args... ts); // using parameter pack expansion we can evaluate the object like f(x1,x2,...,xn)
     void show_varibles();
+
+    T evaluate_num_expression(std::string expr); // Evalua expresiones que constan unicamente de numeros
     ~Function();
 };
 
@@ -219,6 +221,82 @@ int Function<T>::association_order(char c)
     default:
         return 0;
     }
+}
+
+template <typename T>
+std::string Function<T>::sufix_tranform(std::string xpr)
+{
+
+    std::string exprs = xpr, current_op = "";
+
+    std::string fixed_expr = "";
+
+    std::stack<char> Pila;
+    // seaparamos los operandos con '|' para poder usar numeros flotantes o cualquier otra representacion de un numero
+
+    for (size_t i = 0; i < exprs.size(); i++)
+    { // recorremos la expresion infijo
+
+        if (this->is_operator(exprs[i]))
+        { // Si es operador
+            if (fixed_expr[fixed_expr.size() - 1] != '|' && this->is_operator(fixed_expr[fixed_expr.size() - 1]) == false)
+            { // separador para los operandos
+                fixed_expr += '|';
+            }
+
+            while (!Pila.empty() && this->precedence(Pila.top()) > this->precedence(exprs[i]))
+            { // Mientras el operador en el top sea de mayor precedencia lo escribimos y lo sacamos de la pila
+                fixed_expr += Pila.top();
+                Pila.pop();
+            }
+
+            if (Pila.empty() || this->is_parentheses(Pila.top()) || this->precedence(Pila.top()) < this->precedence(exprs[i]))
+            {
+                Pila.push(exprs[i]);
+            }
+            else if (this->precedence(Pila.top()) == this->precedence(exprs[i]))
+            {
+                if (this->association_order(exprs[i]) > 0)
+                { // De izquierda a derecha
+                    fixed_expr += Pila.top();
+                    Pila.pop();
+                    Pila.push(exprs[i]);
+                }
+                else
+                {
+                    Pila.push(exprs[i]);
+                }
+            }
+        }
+        else if (this->is_parentheses(exprs[i]))
+        {
+            if (exprs[i] == '(')
+            { // Si el operador en turno es un parentesis que abre entra en la pila
+                Pila.push(exprs[i]);
+            }
+            else
+            { // Si el parentesis cierra sacamos todos los operadores de la pila hasta encontrar el que abre
+                while (!Pila.empty() && Pila.top() != '(')
+                {
+                    fixed_expr += Pila.top();
+                    Pila.pop();
+                }
+                Pila.pop(); // Descartamos los parentesis
+            }
+        }
+        else if ((exprs[i] - '0' >= 0 && exprs[i] - '0' <= 9) || exprs[i] == '.')
+        {
+            fixed_expr += exprs[i];
+        }
+    }
+
+    while (!Pila.empty())
+    {
+        fixed_expr += Pila.top();
+        Pila.pop();
+    }
+
+    return fixed_expr;
 }
 
 template <typename T>
@@ -398,6 +476,55 @@ T Function<T>::eval_op(T A, char op, T B)
 }
 
 template <typename T>
+T Function<T>::evaluate_num_expression(std::string expr)
+{ // evalution sufix
+    int k = 0;
+    T result;
+
+    std::stack<std::string> Pila;
+    std::string c = "";
+
+    for (size_t i = 0; i < expr.size(); i++)
+    {
+        if ((expr[i] - '0' >= 0 && expr[i] - '0' <= 9) || expr[i] == '.')
+        {
+            c += expr[i];
+        }
+        else if (this->is_operator(expr[i]))
+        {
+            if (c != "")
+            {
+                Pila.push(c);
+                c = "";
+            }
+
+            try
+            {
+                long double A = std::stold(Pila.top());
+                Pila.pop();
+                long double B = std::stold(Pila.top());
+                Pila.pop();
+                T curr = this->eval_op(B, expr[i], A);
+                Pila.push(std::to_string(curr));
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << e.what() << '\n';
+            }
+        }
+        else
+        {
+            Pila.push(c);
+            c = "";
+        }
+    }
+
+    result = std::stold(Pila.top());
+
+    return result;
+}
+
+template <typename T>
 void Function<T>::show_varibles()
 {
     for (auto i : this->variable_names)
@@ -413,7 +540,7 @@ T Function<T>::operator()(std::initializer_list<T> tuple)
     for (size_t i = 0; i < this->expresion.size(); i++)
     {
 
-        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]))
+        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]) || this->expresion[i] == '.')
         {
             newrep += this->expresion[i];
         }
@@ -441,7 +568,10 @@ T Function<T>::operator()(std::initializer_list<T> tuple)
         }
     }
 
-    std::cout << newrep << std::endl;
+    newrep = this->sufix_tranform(newrep);
+
+    // std::cout << newrep << std::endl;
+    return this->evaluate_num_expression(newrep);
 }
 
 template <typename T>
@@ -472,14 +602,16 @@ Function<T>::~Function()
 
 int main(int argc, char const *argv[])
 {
-    Function<int> X("f(x,y,z)", "3*x-7*y+z", {'x', 'y', 'z'}), f("g(x)", "x+1/x-x^2", {'x'});
-    X({1, 2, 3});
-    f(2);
+    Function<double> X("f(x,y,z)", "3.1452*x-7.4*y^0.5+0.88*z", {'x', 'y', 'z'}), f("g(x)", "(1/x)", {'x'});
+    std::cout << X({1, 2, 3}) << std::endl;
+    double k = 0.01;
+    for (size_t i = 1; i < 1000; i++)
+    {
+        std::cout << f({k}) << std::endl;
+        k *= 0.01;
+    }
 
-    int x = 1.0;
-    Expression T("298x");
-    if (T.is_variable())
-        std::cout << X.infijo_to_prefijo("(7*x^2+4*x^2)*y") << std::endl;
-    X.show_varibles();
+    // std::cout << << std::endl;
+
     return 0;
 }

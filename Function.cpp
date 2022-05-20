@@ -239,14 +239,37 @@ std::string Function<T>::sufix_tranform(std::string xpr)
 
         if (this->is_operator(exprs[i]))
         { // Si es operador
-            if (fixed_expr[fixed_expr.size() - 1] != '|' && this->is_operator(fixed_expr[fixed_expr.size() - 1]) == false)
-            { // separador para los operandos
-                fixed_expr += '|';
+
+            if ((exprs[i] == '-' || exprs[i] == '+'))
+            { // estas son excepciones en las cuales el operador '-' o '+' funge como la representacion de un numero negativo o positivo
+
+                if (exprs[i + 1] && (exprs[i + 1] - '0' >= 0 && exprs[i + 1] - '0' <= 9) && i == 0)
+                { // si el operador se encuentra al inicio de la expresion (-1 + 5)
+                    fixed_expr += '|';
+                    fixed_expr += exprs[i];
+                    continue;
+                }
+
+                if (exprs[i - 1] && (this->is_operator(exprs[i - 1])))
+                {
+                    fixed_expr += '|';
+                    fixed_expr += exprs[i];
+                    continue;
+                }
+
+                if (exprs[i - 1] && exprs[i - 1] == '(')
+                {
+                    fixed_expr += '|';
+                    fixed_expr += exprs[i];
+                    continue;
+                }
             }
 
             while (!Pila.empty() && this->precedence(Pila.top()) > this->precedence(exprs[i]))
             { // Mientras el operador en el top sea de mayor precedencia lo escribimos y lo sacamos de la pila
+                fixed_expr += '|';
                 fixed_expr += Pila.top();
+                fixed_expr += '|';
                 Pila.pop();
             }
 
@@ -258,7 +281,9 @@ std::string Function<T>::sufix_tranform(std::string xpr)
             {
                 if (this->association_order(exprs[i]) > 0)
                 { // De izquierda a derecha
+                    fixed_expr += '|';
                     fixed_expr += Pila.top();
+                    fixed_expr += '|';
                     Pila.pop();
                     Pila.push(exprs[i]);
                 }
@@ -278,7 +303,9 @@ std::string Function<T>::sufix_tranform(std::string xpr)
             { // Si el parentesis cierra sacamos todos los operadores de la pila hasta encontrar el que abre
                 while (!Pila.empty() && Pila.top() != '(')
                 {
+                    fixed_expr += '|';
                     fixed_expr += Pila.top();
+                    fixed_expr += '|';
                     Pila.pop();
                 }
                 Pila.pop(); // Descartamos los parentesis
@@ -286,13 +313,27 @@ std::string Function<T>::sufix_tranform(std::string xpr)
         }
         else if ((exprs[i] - '0' >= 0 && exprs[i] - '0' <= 9) || exprs[i] == '.')
         {
+            if (i == 0)
+            {
+                fixed_expr += '|';
+            }
+
             fixed_expr += exprs[i];
+
+            if (exprs[i + 1] && (this->is_operator(exprs[i + 1]) || exprs[i + 1] == ')'))
+            {
+                fixed_expr += '|';
+            }
         }
     }
 
+    // std::cout << current_op << "---" << std::endl;
+
     while (!Pila.empty())
-    {
+    { // sacamos el resto de operadores de la pila
+        fixed_expr += '|';
         fixed_expr += Pila.top();
+        fixed_expr += '|';
         Pila.pop();
     }
 
@@ -453,6 +494,9 @@ T Function<T>::eval_op(T A, char op, T B)
 {
     if (op == '^')
     {
+
+        if (B < 0)
+            throw std::invalid_argument("Negative square root :(!");
         return std::pow(A, B);
     }
     else if (op == '*')
@@ -461,6 +505,8 @@ T Function<T>::eval_op(T A, char op, T B)
     }
     if (op == '/')
     {
+        if (B == 0)
+            throw std::invalid_argument("Zero division :(!");
         return A / B;
     }
     if (op == '+')
@@ -469,6 +515,7 @@ T Function<T>::eval_op(T A, char op, T B)
     }
     if (op == '-')
     {
+
         return A - B;
     }
 
@@ -478,45 +525,52 @@ T Function<T>::eval_op(T A, char op, T B)
 template <typename T>
 T Function<T>::evaluate_num_expression(std::string expr)
 { // evalution sufix
+    // std::cout << ">:v\n";
     int k = 0;
     T result;
 
     std::stack<std::string> Pila;
     std::string c = "";
 
-    for (size_t i = 0; i < expr.size(); i++)
+    while (k < expr.size())
     {
-        if ((expr[i] - '0' >= 0 && expr[i] - '0' <= 9) || expr[i] == '.')
+        // std::cout << "w>:v\n";
+        if (expr[k] != '|')
         {
-            c += expr[i];
-        }
-        else if (this->is_operator(expr[i]))
-        {
-            if (c != "")
-            {
-                Pila.push(c);
-                c = "";
-            }
-
-            try
-            {
-                long double A = std::stold(Pila.top());
-                Pila.pop();
-                long double B = std::stold(Pila.top());
-                Pila.pop();
-                T curr = this->eval_op(B, expr[i], A);
-                Pila.push(std::to_string(curr));
-            }
-            catch (const std::exception &e)
-            {
-                std::cerr << e.what() << '\n';
-            }
+            c += expr[k];
         }
         else
         {
-            Pila.push(c);
-            c = "";
+            if (c != "")
+            {
+                // std::cout << c << std::endl;
+                if (c.size() == 1 && this->is_operator(c[0]))
+                {
+                    try
+                    {
+                        long double A = std::stold(Pila.top());
+                        Pila.pop();
+                        long double B = std::stold(Pila.top());
+                        Pila.pop();
+                        T curr = this->eval_op(B, c[0], A);
+                        Pila.push(std::to_string(curr));
+
+                        // std::cout << B << c[0] << A << std::endl;
+                    }
+                    catch (const std::exception &e)
+                    {
+                        std::cerr << e.what() << '\n';
+                    }
+                }
+                else
+                {
+                    Pila.push(c);
+                }
+                c = "";
+            }
         }
+
+        k++;
     }
 
     result = std::stold(Pila.top());
@@ -560,7 +614,7 @@ T Function<T>::operator()(std::initializer_list<T> tuple)
             {
                 if (k == p)
                 {
-                    newrep += ('(' + std::to_string(iter) + ')');
+                    newrep += ("(" + std::to_string(iter) + ")");
                     break;
                 }
                 k++;
@@ -568,6 +622,7 @@ T Function<T>::operator()(std::initializer_list<T> tuple)
         }
     }
 
+    std::cout << newrep << std::endl;
     newrep = this->sufix_tranform(newrep);
 
     // std::cout << newrep << std::endl;
@@ -592,7 +647,8 @@ T Function<T>::operator()(const T &value)
         }
     }
 
-    std::cout << newrep << std::endl;
+    newrep = this->sufix_tranform(newrep);
+    return this->evaluate_num_expression(newrep);
 }
 
 template <typename T>
@@ -602,16 +658,11 @@ Function<T>::~Function()
 
 int main(int argc, char const *argv[])
 {
-    Function<double> X("f(x,y,z)", "3.1452*x-7.4*y^0.5+0.88*z", {'x', 'y', 'z'}), f("g(x)", "(1/x)", {'x'});
-    std::cout << X({1, 2, 3}) << std::endl;
-    double k = 0.01;
-    for (size_t i = 1; i < 1000; i++)
-    {
-        std::cout << f({k}) << std::endl;
-        k *= 0.01;
-    }
+    Function<double> X("f(x,y)", "(2*x*(y^3)+4*x^4*y^2)/(x^2-4)", {'x', 'y'}), f("g(x)", "(1/x)", {'x'});
 
-    // std::cout << << std::endl;
+    double k = 0.01;
+    // X({-1, -1.5});
+    std::cout << X({-1, -1.5}) << std::endl;
 
     return 0;
 }

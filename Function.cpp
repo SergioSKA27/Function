@@ -51,8 +51,11 @@
 
 // Autor: Lopez Martinez Sergio Demis
 
-// This struct will help us to create the sintax tree
-// to evaluate the functions
+// La macro str_to_value nos ayuda a convertir un tipo de dato string a uno numerico del tipo seleccionado
+// esto nos permite poder usar la clase con implementaciones propias de un tipo de dato con los operadores
+// aritmeticos sobrecargados y que a su vez tenga setido una expresion algebraica, es decir que el tipo de
+// dato que implementemos debe de poder hacer uso de los operadores aritmericos (+,-,*,/,^) y similarmente
+// debe de poder usar los operadores booleanos (==, < ,>,>=,<=,!=)
 
 class Expression
 {
@@ -121,6 +124,7 @@ size_t Expression::size() const
 
 Expression Expression::operator+(const Expression &expr)
 {
+    Expression ex("");
     if (expr.is_variable() && this->is_variable())
     {
         int k = 0;
@@ -144,6 +148,8 @@ Expression Expression::operator+(const Expression &expr)
             }
         }
     }
+
+    return ex;
 }
 
 Expression::~Expression()
@@ -171,7 +177,6 @@ private:
     std::vector<char> variable_names; // vector para el nombre de las variables
     std::string expresion;            // representacion normal  de la funcion
     std::string sufix_expr;           // representacion sufijo
-    std::string prefix_expr;          // representacion prefijo
 
     std::string sufix_tranform(std::string xpr);
     Function<T> &prefix_tranform();
@@ -186,10 +191,9 @@ private:
 
 public:
     Function(std::string name, std::string func, std::initializer_list<char> variables);
-    std::string infijo_to_prefijo(std::string expr);
-    std::string infijo_to_sufijo(std::string expr);
-    T operator()(const T &value);                 // return the function valued in T value
     T operator()(std::initializer_list<T> tuple); // retunr the function in n-tuple of T values
+    T operator()(std::vector<T> tuple);           // retunr the function in n-tuple of T values
+    T operator()(T *tuple);                       // retunr the function in n-tuple of T values
     template <typename... args>
     T operator()(args... ts); // using parameter pack expansion we can evaluate the object like f(x1,x2,...,xn)
     void show_varibles();
@@ -203,7 +207,6 @@ Function<T>::Function(std::string name, std::string func, std::initializer_list<
 {
     this->name = name;
     this->expresion = func;
-    this->prefix_expr = this->infijo_to_prefijo(func);
 
     for (auto e : variables)
     {
@@ -380,148 +383,6 @@ std::string Function<T>::sufix_tranform(std::string xpr)
 }
 
 template <typename T>
-std::string Function<T>::infijo_to_sufijo(std::string expr)
-{
-    std::string result = "";
-    std::stack<char> Pl;
-
-    for (int i = 0; i < expr.size(); i++)
-    {
-        if (this->is_operator(expr[i]))
-        {
-            // Si es operador se compara contra la pila
-            while (!Pl.empty() && this->precedence(Pl.top()) > this->precedence(expr[i]))
-            { // Si el top es de mayor precedencia que el operador actual lo escribimos
-                result = result + Pl.top();
-                Pl.pop();
-            }
-
-            if (Pl.empty() || this->precedence(Pl.top()) < this->precedence(expr[i]) || this->is_parentheses(Pl.top()))
-            { // si la pila esta vacia o el operador en turno de es de menor precedencia que el top de la pila
-                Pl.push(expr[i]);
-            }
-            else
-            { // El operador en turno y el top de la pila tienen la misma precedencia
-
-                if (this->association_order(expr[i]) > 0) // izquierda a derecha
-                {
-                    result = result + Pl.top();
-                    Pl.pop();
-                    Pl.push(expr[i]);
-                }
-                else
-                {
-                    Pl.push(expr[i]);
-                }
-            }
-        }
-        else
-        {
-            if (this->is_parentheses(expr[i]))
-            { // Si es parentesis revisamos si abre o cierra
-                if (expr[i] == '(')
-                {
-                    Pl.push(expr[i]); // si es un parentesis que abre lo ponemos en la pila
-                }
-                else
-                { // si el parentesis cierra sacamos los operadores de la pila hasta encontrar el que abre
-                    while (Pl.top() != '(' && !Pl.empty())
-                    {
-                        result = result + Pl.top();
-                        Pl.pop();
-                    }
-                    Pl.pop(); // eliminamos el parentesis que abre
-                }
-            }
-            else
-            {
-                // Si es operando lo escribimos directamente
-                result = result + expr[i];
-            }
-        }
-    }
-
-    while (!Pl.empty())
-    {
-        result = result + Pl.top();
-        Pl.pop();
-    }
-
-    return result;
-}
-
-template <typename T>
-std::string Function<T>::infijo_to_prefijo(std::string expr)
-{
-    std::string result = "";
-    std::stack<char> Pl;
-
-    for (int i = expr.size() - 1; i >= 0; i--)
-    {
-        if (this->is_operator(expr[i]))
-        {
-            // Si es operador se compara contra la pila
-            while (!Pl.empty() && this->precedence(Pl.top()) > this->precedence(expr[i]))
-            { // Si el top es de mayor precedencia que el operador actual lo escribimos
-                result = Pl.top() + result;
-                Pl.pop();
-            }
-
-            if (Pl.empty() || this->precedence(Pl.top()) < this->precedence(expr[i]) || this->is_parentheses(Pl.top()))
-            { // si la pila esta vacia o el operador en turno de es de menor precedencia que el top de la pila
-                Pl.push(expr[i]);
-            }
-            else
-            { // El operador en turno y el top de la pila tienen la misma precedencia
-
-                if (this->association_order(expr[i]) < 0) // derecha a izquierda
-                {
-                    result = Pl.top() + result;
-                    Pl.pop();
-                    Pl.push(expr[i]);
-                }
-                else
-                {
-                    Pl.push(expr[i]);
-                }
-            }
-        }
-        else
-        {
-            if (this->is_parentheses(expr[i]))
-            { // Si es parentesis revisamos si abre o cierra
-                if (expr[i] == ')')
-                {
-                    Pl.push(expr[i]); // si es un parentesis que abre lo ponemos en la pila
-                }
-                else
-                { // si el parentesis cierra sacamos los operadores de la pila hasta encontrar el que abre
-                    while (Pl.top() != ')' && !Pl.empty())
-                    {
-                        result = Pl.top() + result;
-                        Pl.pop();
-                    }
-                    Pl.pop(); // eliminamos el parentesis que abre
-                }
-            }
-            else
-            {
-                // Si es operando lo escribimos directamente
-                result = expr[i] + result;
-            }
-        }
-    }
-
-    while (!Pl.empty())
-    {
-        result = Pl.top() + result;
-        Pl.pop();
-    }
-
-    return result;
-}
-
-template <typename T>
 Function<T> &Function<T>::fix_expression()
 {
 
@@ -669,24 +530,113 @@ T Function<T>::operator()(std::initializer_list<T> tuple)
 }
 
 template <typename T>
-T Function<T>::operator()(const T &value)
+T Function<T>::operator()(std::vector<T> tuple)
 {
 
     std::string newrep = "";
     for (size_t i = 0; i < this->expresion.size(); i++)
     {
 
-        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]))
+        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]) || this->expresion[i] == '.')
         {
             newrep += this->expresion[i];
         }
         else
         {
-            newrep += ('(' + std::to_string(value) + ')');
+            int p = 0, k = 0;
+            for (size_t j = 0; j < this->variable_names.size(); j++)
+            {
+                if (this->expresion[i] == this->variable_names[j])
+                {
+                    p = j;
+                    break;
+                }
+            }
+
+            if (tuple[p])
+                newrep += ("(" + std::to_string(tuple[p]) + ")");
         }
     }
 
+    std::cout << newrep << std::endl;
     newrep = this->sufix_tranform(newrep);
+
+    // std::cout << newrep << std::endl;
+    return this->evaluate_num_expression(newrep);
+}
+
+template <typename T>
+T Function<T>::operator()(T *tuple)
+{
+
+    std::string newrep = "";
+    for (size_t i = 0; i < this->expresion.size(); i++)
+    {
+
+        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]) || this->expresion[i] == '.')
+        {
+            newrep += this->expresion[i];
+        }
+        else
+        {
+            int p = 0, k = 0;
+            for (size_t j = 0; j < this->variable_names.size(); j++)
+            {
+                if (this->expresion[i] == this->variable_names[j])
+                {
+                    p = j;
+                    break;
+                }
+            }
+
+            if (tuple[p])
+                newrep += ("(" + std::to_string(tuple[p]) + ")");
+        }
+    }
+
+    std::cout << newrep << std::endl;
+    newrep = this->sufix_tranform(newrep);
+
+    // std::cout << newrep << std::endl;
+    return this->evaluate_num_expression(newrep);
+}
+
+template <typename T>
+template <typename... args>
+T Function<T>::operator()(args... ts)
+{
+
+    T res[sizeof...(args)] = {ts...};
+
+    std::string newrep = "";
+    for (size_t i = 0; i < this->expresion.size(); i++)
+    {
+
+        if ((this->expresion[i] - '0' >= 0 && this->expresion[i] - '0' <= 9) || this->is_operator(this->expresion[i]) || this->is_parentheses(this->expresion[i]) || this->expresion[i] == '.')
+        {
+            newrep += this->expresion[i];
+        }
+        else
+        {
+            int p = 0, k = 0;
+            for (size_t j = 0; j < this->variable_names.size(); j++)
+            {
+                if (this->expresion[i] == this->variable_names[j])
+                {
+                    p = j;
+                    break;
+                }
+            }
+
+            if (res[p])
+                newrep += ("(" + std::to_string(res[p]) + ")");
+        }
+    }
+
+    std::cout << newrep << std::endl;
+    newrep = this->sufix_tranform(newrep);
+
+    // std::cout << newrep << std::endl;
     return this->evaluate_num_expression(newrep);
 }
 
@@ -697,8 +647,8 @@ Function<T>::~Function()
 
 int main(int argc, char const *argv[])
 {
-    Function<long double> X("f(x,y,z,w)", "(2*x*y^4+4*y^2*z-2*z^8*w)/(x^4*y^3-1)", {'x', 'y', 'z', 'w'}), f("g(x)", "(1/x)", {'x'});
-
+    Function<long double> X("f(x,y,z,w)", "(2*x*y^4+4*y^2*z-2*z^8*w)/(x^4*y^3-1)", {'x', 'y', 'z', 'w'}), f("g(x)", "(1/(x))", {'x'});
+    long double t[2] = {5, 10};
     std::cout << str_to_value(int, "5684") << std::endl;
 
     /*std::stof();
@@ -709,7 +659,7 @@ int main(int argc, char const *argv[])
 
     double k = 0.01;
     // X({-1, -1.5});
-    std::cout << X({-1, -1, 8, 4}) << std::endl;
+    std::cout << f(1.0654) << std::endl;
 
     return 0;
 }

@@ -191,6 +191,11 @@ private:
 
 public:
     Function(std::string name, std::string func, std::initializer_list<char> variables);
+    Function(std::string name, std::string func, std::vector<char> variables);
+    Function(std::string name, std::string func, char *variables);
+    template <typename... argstr>
+    Function(std::string name, std::string func, argstr... ts);
+
     T operator()(std::initializer_list<T> tuple); // retunr the function in n-tuple of T values
     T operator()(std::vector<T> tuple);           // retunr the function in n-tuple of T values
     T operator()(T *tuple);                       // retunr the function in n-tuple of T values
@@ -211,6 +216,46 @@ Function<T>::Function(std::string name, std::string func, std::initializer_list<
     for (auto e : variables)
     {
         this->variable_names.push_back(e);
+    }
+}
+
+template <typename T>
+Function<T>::Function(std::string name, std::string func, std::vector<char> variables)
+{
+    this->name = name;
+    this->expresion = func;
+    this->variable_names = variables;
+}
+
+template <typename T>
+Function<T>::Function(std::string name, std::string func, char *variables)
+{
+    this->name = name;
+    this->expresion = func;
+
+    size_t k = 0;
+
+    while (variables[k])
+    {
+        this->variable_names.push_back(variables[k]);
+        k++;
+    }
+}
+
+template <typename T>
+template <typename... argstr>
+Function<T>::Function(std::string name, std::string func, argstr... ts)
+{
+    char dummy[sizeof...(argstr)] = {ts...};
+    this->name = name;
+    this->expresion = func;
+
+    size_t k = 0;
+
+    while (dummy[k])
+    {
+        this->variable_names.push_back(dummy[k]);
+        k++;
     }
 }
 
@@ -647,7 +692,7 @@ Function<T>::~Function()
 
 int main(int argc, char const *argv[])
 {
-    Function<long double> X("f(x,y,z,w)", "(2*x*y^4+4*y^2*z-2*z^8*w)/(x^4*y^3-1)", {'x', 'y', 'z', 'w'}), f("g(x)", "(1/(x))", {'x'});
+    Function<long double> X("f(x,y,z,w)", "(2*x*y^4+4", {'x', 'y'}), f("g(x)", "-1*x^3-t+w", 'x', 't', 'w');
     long double t[2] = {5, 10};
     std::cout << str_to_value(int, "5684") << std::endl;
 
@@ -659,7 +704,7 @@ int main(int argc, char const *argv[])
 
     double k = 0.01;
     // X({-1, -1.5});
-    std::cout << f(1.0654) << std::endl;
+    std::cout << f(1.0654, 4.5, -0.333) << std::endl;
 
     return 0;
 }

@@ -2,7 +2,6 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <math.h>
 #include <stack>
 #include <queue>
 #include <bitset>
@@ -10,6 +9,46 @@
 #include <bit>
 #include <algorithm>
 #include <cmath>
+
+#define str_to_value(type, value)                \
+    ({                                           \
+        type value_n;                            \
+                                                 \
+        if (typeid(int) == typeid(type))         \
+        {                                        \
+            value_n = std::stoi(value);          \
+        }                                        \
+                                                 \
+        if (typeid(float) == typeid(type))       \
+        {                                        \
+            value_n = std::stof(value);          \
+        }                                        \
+                                                 \
+        if (typeid(double) == typeid(type))      \
+        {                                        \
+            value_n = std::stod(value);          \
+        }                                        \
+        value_n;                                 \
+                                                 \
+        if (typeid(long double) == typeid(type)) \
+        {                                        \
+            value_n = std::stold(value);         \
+        }                                        \
+        value_n;                                 \
+                                                 \
+        if (typeid(long) == typeid(type))        \
+        {                                        \
+            value_n = std::stol(value);          \
+        }                                        \
+        value_n;                                 \
+                                                 \
+        if (typeid(long long) == typeid(type))   \
+        {                                        \
+            value_n = std::stoll(value);         \
+        }                                        \
+        value_n;                                 \
+    })
+
 // Autor: Lopez Martinez Sergio Demis
 
 // This struct will help us to create the sintax tree
@@ -548,9 +587,9 @@ T Function<T>::evaluate_num_expression(std::string expr)
                 {
                     try
                     {
-                        long double A = std::stold(Pila.top());
+                        T A = str_to_value(T, Pila.top());
                         Pila.pop();
-                        long double B = std::stold(Pila.top());
+                        T B = str_to_value(T, Pila.top());
                         Pila.pop();
                         T curr = this->eval_op(B, c[0], A);
                         Pila.push(std::to_string(curr));
@@ -658,11 +697,19 @@ Function<T>::~Function()
 
 int main(int argc, char const *argv[])
 {
-    Function<double> X("f(x,y)", "(2*x*(y^3)+4*x^4*y^2)/(x^2-4)", {'x', 'y'}), f("g(x)", "(1/x)", {'x'});
+    Function<long double> X("f(x,y,z,w)", "(2*x*y^4+4*y^2*z-2*z^8*w)/(x^4*y^3-1)", {'x', 'y', 'z', 'w'}), f("g(x)", "(1/x)", {'x'});
+
+    std::cout << str_to_value(int, "5684") << std::endl;
+
+    /*std::stof();
+    std::stol();
+    std::stoll();
+    std::stold();
+    std::stod();*/
 
     double k = 0.01;
     // X({-1, -1.5});
-    std::cout << X({-1, -1.5}) << std::endl;
+    std::cout << X({-1, -1, 8, 4}) << std::endl;
 
     return 0;
 }
